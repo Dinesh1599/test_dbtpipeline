@@ -1,0 +1,51 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# Each source below is one parquet file (or glob) that YOU produce from MSSQL.
+# The legacy script reads MORE than one RyanB table — surfacing that here was
+# the main thing the "Postgres vs SQL Server" detour turned up:
+#
+#   1. PRIME3_..._Vehicle_DW   -> vehicle/policy grain base        (File2 L31)
+#   2. PRIME3_..._CVG_DW        -> coverage grain, full-term premium (File2 L150)
+#   3. PRIME3_..._VEHICLERAW    -> Final_BUS_SRC for the eSales flag (File2 L358)
+#   4. PRIME3_..._Premium_<cov> -> EIGHT on-level premium tables     (File2 L223)
+#                                  BI/PIP/PD/COLL/COMP/UMBI/UMPD/TOTAL_VEH
+#   5. CLAIMS_NJ..T_LOSS_RESERVE-> losses                            (File2 L414)
+#
+# The `external_location` is a dbt-duckdb convenience: it lets staging models do
+# {{ source(...) }} and have it resolve straight to read_parquet(...). Point
+# these at wherever your extract drops the files (NJ_LR_PARQUET_DIR).
+# ---------------------------------------------------------------------------
+
+sources:
+  - name: ryanb
+    description: "PRIME3 actuarial extract tables, exported from the RyanB warehouse to parquet."
+    meta:
+      external_location: "read_parquet('{{ env_var('NJ_LR_PARQUET_DIR', 'data') }}/{name}.parquet')"
+    tables:
+      - name: pol_vehicle
+        description: "PRIME3_POL_ACTUARIAL_all_pk_thru_2025Q2_Vehicle_DW — one row per vehicle/policy term."
+      - name: pol_cvg
+        description: "PRIME3_POL_ACTUARIAL_all_pk_thru_2025Q2_CVG_DW — one row per coverage; carries FULL_TERM_PRMM_TOTAL, CVG_CD, CNTRBT_TO_PRMM_FLG, LMT_1_DESC."
+      - name: pol_vehicleraw
+        description: "PRIME3_POL_ACTUARIAL_all_pk_thru_2025Q2_VEHICLERAW — carries Final_BUS_SRC (eSales detection)."
+
+      # The eight per-coverage on-level premium tables. Extract each to its own
+      # parquet named premium_<cov>.parquet. Column to sum differs (see
+      # var premium_sources): TotPrem for all except TOTAL_VEH -> Total.
+      - name: premium_bi
+      - name: premium_pip
+      - name: premium_pd
+      - name: premium_coll
+      - name: premium_comp
+      - name: premium_umbi
+      - name: premium_umpd
+      - name: premium_total_veh
+
+  - name: claims
+    description: "Claims warehouse (linked server CO1DAGWPV02), exported to parquet."
+    meta:
+      external_location: "read_parquet('{{ env_var('NJ_LR_PARQUET_DIR', 'data') }}/{name}.parquet')"
+    tables:
+      - name: t_loss_reserve
+        description: "CLAIMS_NJ.DBO.T_LOSS_RESERVE — reserve/feature grain loss records."

@@ -1,0 +1,21 @@
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/profiles.yml
+
+# data / outputs
+data/
+output/
+*.duckdb
+*.parquet
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# secrets
+.env
+config.yml

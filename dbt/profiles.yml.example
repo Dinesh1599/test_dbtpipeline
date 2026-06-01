@@ -1,0 +1,21 @@
+# Copy to ~/.dbt/profiles.yml (or set DBT_PROFILES_DIR to this folder).
+#
+# Reads parquet that you extracted from MSSQL; writes marts back out to parquet.
+# DuckDB needs no server — `path` is just a local file used as the working db.
+
+nj_lr:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'nj_lr.duckdb') }}"
+      threads: 4
+      extensions:
+        - parquet
+      settings:
+        # The final 39.7M-row join was the 26-min bottleneck in T-SQL. DuckDB
+        # is far faster but still memory-hungry on that join; raise/lower to fit
+        # your machine. Spill to disk if you blow past RAM.
+        memory_limit: '12GB'
+        temp_directory: "{{ env_var('DUCKDB_TMP', '/tmp/duckdb_spill') }}"
+        preserve_insertion_order: false

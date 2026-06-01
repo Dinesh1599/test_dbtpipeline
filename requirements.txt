@@ -1,0 +1,13 @@
+# Transform
+dbt-core>=1.7,<2.0
+dbt-duckdb>=1.7,<2.0
+duckdb>=0.10
+
+# Extract
+connectorx>=0.3.2
+pyarrow>=14.0
+pyyaml>=6.0
+
+# Orchestration (install where Airflow runs; pin to your Airflow version)
+# apache-airflow>=2.8
+# astronomer-cosmos>=1.4   # optional, for per-model Airflow tasks

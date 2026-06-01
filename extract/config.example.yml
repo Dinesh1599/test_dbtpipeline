@@ -1,0 +1,37 @@
+# Maps each parquet file the dbt project expects (left) to the real MSSQL
+# object to pull it from (right). The extractor writes <name>.parquet into
+# NJ_LR_PARQUET_DIR. Edit the source names / prefilters to match your warehouse;
+# the dbt side only cares about the output file names.
+
+prefix: "PRIME3_POL_ACTUARIAL_all_pk_thru_2025Q2"   # the long table-name stem
+
+ryanb:
+  # connection string env var holding the RyanB / XWei warehouse DSN
+  conn_env: NJ_LR_RYANB_CONN
+  tables:
+    pol_vehicle:        "{prefix}_Vehicle_DW"
+    pol_cvg:            "{prefix}_CVG_DW"
+    pol_vehicleraw:     "{prefix}_VEHICLERAW"
+    premium_bi:         "{prefix}_Premium_BI"
+    premium_pip:        "{prefix}_Premium_PIP"
+    premium_pd:         "{prefix}_Premium_PD"
+    premium_coll:       "{prefix}_Premium_COLL"
+    premium_comp:       "{prefix}_Premium_COMP"
+    premium_umbi:       "{prefix}_Premium_UMBI"
+    premium_umpd:       "{prefix}_Premium_UMPD"
+    premium_total_veh:  "{prefix}_Premium_TOTAL_VEH"
+
+claims:
+  conn_env: NJ_LR_CLAIMS_CONN
+  tables:
+    # Prefilter pushed to the server so you don't drag the whole reserve table
+    # across the wire. Mirrors stg_claims_loss_reserve's WHERE.
+    t_loss_reserve: |
+      SELECT *
+      FROM CLAIMS_NJ.DBO.T_LOSS_RESERVE WITH (NOLOCK)
+      WHERE PROD_CD = 'PA'
+        AND ACC_MO >= 201901
+        AND CO_CD IN ('ALN_HPCIC','ALN_PIC','ALN_PSIA','PSIA','ALN_TEACH')
+        AND POLICY_STATE = 'NJ'
+        AND PRMY_ACC_CAUSE <> 'rent'
+        AND (VOID_FLG IS NULL OR VOID_FLG = 'N')

@@ -1,0 +1,68 @@
+name: 'nj_lr'
+version: '1.0.0'
+config-version: 2
+
+profile: 'nj_lr'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# ---------------------------------------------------------------------------
+# Vars: these replace the dynamic-SQL coverage lists / NewTmpList loops that
+# the legacy procedure built at runtime. Edit these, NOT the model SQL, when a
+# coverage is added or a source table is renamed.
+# ---------------------------------------------------------------------------
+vars:
+  # The pipeline only looks at accident quarters from this point forward.
+  # Legacy: WHERE YYYYQT >= 201901  (and ACC_MO >= 201901 on the claims side).
+  start_yyyyqt: 201901
+
+  # Valuation / cutoff date. Legacy derived this from MAX(LSTDAY) of the
+  # monthly calendar table tmp_NJfreq_mon WHERE LSTDAY < GETDATE(), then capped
+  # END_DT at this. That monthly table was NEVER in the photographed file, so it
+  # is surfaced here as an explicit knob. Set it to the same as-of date the
+  # legacy run used (the quarter boundary just past your data extract).
+  valuation_date: '2025-07-01'
+
+  # The 8 per-coverage on-level premium SOURCE tables and the premium column to
+  # sum from each. Legacy: PRIME3_..._Premium_<Cov>, summing 'TotPrem' for every
+  # coverage EXCEPT TOTAL_VEH which sums 'Total'.  (File2 ~L212-225)
+  premium_sources:
+    BI: TotPrem
+    PIP: TotPrem
+    PD: TotPrem
+    COLL: TotPrem
+    COMP: TotPrem
+    UMBI: TotPrem
+    UMPD: TotPrem
+    TOTAL_VEH: Total
+
+  # Wide on-level columns produced on the policy grain after UMBI+UMPD->UM and
+  # TOTAL_VEH->TOTAL collapse.  (File2 ~L259-291)  OLEP_OTHER is derived.
+  premium_wide_coverages: ['BI', 'PIP', 'PD', 'COLL', 'COMP', 'UM', 'TOTAL']
+
+  # Coverages carried through Exhibit 2 (the accident-quarter pivot).
+  # Legacy NewTmpList @Values = 'BI,PIP,PD,COLL,COMP,UM,OTHER'  (File2 ~L709)
+  accqtr_coverages: ['BI', 'PIP', 'PD', 'COLL', 'COMP', 'UM', 'OTHER']
+
+models:
+  nj_lr:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: table
+    marts:
+      # dbt-duckdb 'external' writes the model straight out to parquet so the
+      # result is browsable in any DuckDB session without the .duckdb file.
+      # NB: `location` uses {{ this }}, which isn't available in this yaml at
+      # parse time, so it is set in each mart's own config() block instead.
+      +materialized: external
+      +format: parquet
+
+seeds:
+  nj_lr:
+    +quote_columns: false
